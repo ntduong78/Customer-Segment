@@ -928,5 +928,5 @@ elif selected_option == 'New Prediction':
             # Add the predicted cluster to the df_RFM DataFrame
             df_RFM['Cluster'] = user_clusters
             
-            st.write("Predicted Cluster:", user_clusters[0])
+         
 
