@@ -1,0 +1,4 @@
+Model,Execution Time (s),Silhouette Score
+RFM Analysis,0.1149039268493652,0.0
+KMean Clustering,0.05915212631225586,0.6626514024494682
+Hierachical Clustering,25.21237254142761,0.6067529823165326
