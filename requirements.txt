@@ -10,3 +10,4 @@ scikit-learn
 pyspark
 datetime
 joblib
+kaleido
