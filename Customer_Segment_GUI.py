@@ -929,8 +929,4 @@ elif selected_option == 'New Prediction':
             df_RFM['Cluster'] = user_clusters
             
             st.write("Predicted Cluster:", user_clusters[0])
-            if user_clusters[0] == 0:
-                st.write("Lost Customer")
-            else:
-                st.write("Active Customer")
 
