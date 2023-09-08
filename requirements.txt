@@ -1,8 +1,4 @@
-time
-pickle
 Pillow
-os
-re
 streamlit
 pandas
 numpy
