@@ -759,16 +759,16 @@ elif selected_option == 'Build Project':
         kmeans_results.to_csv(csv_file_path, index=False)
 
         
-    # Perform Hierachical Clustering
-    if st.button("Perform Hierachical Clustering",key="tree"):
-        rfm_selected = df_RFM[['Recency','Frequency','Monetary']]
-        tree_results, tree_time, tree_silhouette = perform_hierarchical_clustering(rfm_selected,num_clusters)
-        update_global_results("Hierachical Clustering", tree_time, tree_silhouette)
-        # Define the file path where you want to save the CSV file
-        csv_file_path = "tree_results.csv"
+    # # Perform Hierachical Clustering
+    # if st.button("Perform Hierachical Clustering",key="tree"):
+    #     rfm_selected = df_RFM[['Recency','Frequency','Monetary']]
+    #     tree_results, tree_time, tree_silhouette = perform_hierarchical_clustering(rfm_selected,num_clusters)
+    #     update_global_results("Hierachical Clustering", tree_time, tree_silhouette)
+    #     # Define the file path where you want to save the CSV file
+    #     csv_file_path = "tree_results.csv"
 
-        # Use the to_csv method to write the DataFrame to a CSV file
-        tree_results.to_csv(csv_file_path, index=False)
+    #     # Use the to_csv method to write the DataFrame to a CSV file
+    #     tree_results.to_csv(csv_file_path, index=False)
 
     # # Perform K-Means clustering pyspark
     # if st.button("Perform Pyspark K-Means Clustering"):
