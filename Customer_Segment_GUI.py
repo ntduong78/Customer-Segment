@@ -33,8 +33,8 @@ pio.templates.default = 'plotly'
 current_date = datetime.now()
 
 # Define a function to load data
-def load_data():
-    data_path = 'CDNOW_master/CDNOW_master.txt'
+def load_data(data_path):
+    
     columns = ['customer_id', 'transaction_date', 'num_cds_purchased', 'transaction_value']
     df = pd.read_csv(data_path, sep='\s+', header=None, names=columns)
     return df
@@ -712,15 +712,17 @@ if selected_option == 'Business Objective':
     st.image("Customer_Segmentation.png")
 
 elif selected_option == 'Build Project':
-    df = load_data()
+    data_path = 'CDNOW_master/CDNOW_master.txt'
+    df = load_data(data_path)
     # Upload file
     uploaded_file = st.file_uploader("Choose a file", type=['txt'])
-
+    #st.write(uploaded_file.name)
     if uploaded_file is not None:
+        file_name = uploaded_file.name
         # Load and preprocess the data
-        df = pd.read_csv(uploaded_file, encoding='latin-1')
+        df = load_data(file_name)
         df.to_csv("CDNOW_master_new.txt", index=False)
-
+    st.write(df.shape)
     # Create a dropdown or radio button widget to select the number of clusters
     num_clusters = st.radio("Select Number of Clusters", [2, 3])
 
