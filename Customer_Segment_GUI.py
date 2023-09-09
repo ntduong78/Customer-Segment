@@ -693,7 +693,8 @@ def update_global_results(model_name, execution_time, silhouette_score, csv_file
 # Create a global DataFrame to store results
 global_results_df = pd.DataFrame(columns=["Model", "Execution Time (s)", "Silhouette Score"])
 
-
+data_path = 'CDNOW_master/CDNOW_master.txt'
+df = load_data(data_path)
 # ---------------------------------
 # GUI
 # Create a Streamlit app
@@ -712,8 +713,7 @@ if selected_option == 'Business Objective':
     st.image("Customer_Segmentation.png")
 
 elif selected_option == 'Build Project':
-    data_path = 'CDNOW_master/CDNOW_master.txt'
-    df = load_data(data_path)
+    
     # Upload file
     uploaded_file = st.file_uploader("Choose a file", type=['txt'])
     #st.write(uploaded_file.name)
@@ -857,7 +857,7 @@ elif selected_option == 'New Prediction':
     valid_input = False
 
     while not valid_input:
-        customer_id = st.text_input(label="Enter Customer ID:", key="customer_id_input")
+        #customer_id = st.text_input(label="Enter Customer ID:", key="customer_id_input")
         transaction_date = st.text_input(label="Enter Transaction Date (19970101 to 19980630, YYYYMMDD):", key="transaction_date_input")
         num_cds_purchased = st.number_input(label="Enter Number of CDs Purchased:", min_value=1, step=1, key="num_cds_purchased_input")
         transaction_value = st.number_input(label="Enter Transaction Value (greater than 0.0):", min_value=0.01, format="%.2f", key="transaction_value_input")
@@ -878,11 +878,11 @@ elif selected_option == 'New Prediction':
             st.stop()
 
         # Validate customer_id
-        valid_customer_id = False
-        if re.match(r'^\d{1,5}$', customer_id):
-            valid_customer_id = True
-        else:
-            st.warning("Customer ID should be a numeric string with a maximum of 5 characters.")
+        # valid_customer_id = False
+        # if re.match(r'^\d{1,5}$', customer_id):
+        #     valid_customer_id = True
+        # else:
+        #     st.warning("Customer ID should be a numeric string with a maximum of 5 characters.")
 
 
         # Validate num_cds_purchased and transaction_value
@@ -894,7 +894,8 @@ elif selected_option == 'New Prediction':
             st.warning("Transaction value should be greater than 0.0.")
             valid_values = False
 
-        if not valid_date or not valid_customer_id or not valid_values:
+        #if not valid_date or not valid_customer_id or not valid_values:
+        if not valid_date or not valid_values:
             st.warning("Please fill in all fields with valid values.")
         else:
             valid_input = True
@@ -903,29 +904,53 @@ elif selected_option == 'New Prediction':
     if valid_input:
         if st.button("Submit"):
             # Create a DataFrame from the user's input
+            # user_input_df = pd.DataFrame({
+            #     'customer_id': [customer_id],
+            #     'transaction_date': [transaction_date],
+            #     'transaction_value': [transaction_value],
+            #     'num_cds_purchased': [num_cds_purchased]
+            # })
+
+            # # Process the user input data
+            # # Convert 'transaction_date' to datetime64 format
+            # user_input_df['transaction_date'] = pd.to_datetime(user_input_df['transaction_date'], format='%Y%m%d')
+
+            # df_RFM = user_input_df.groupby('customer_id').agg({
+            #     'transaction_date': lambda x: (end_date - x.max()).days,
+            #     'transaction_value': ['count', 'sum']
+            # })
+
             user_input_df = pd.DataFrame({
-                'customer_id': [customer_id],
                 'transaction_date': [transaction_date],
                 'transaction_value': [transaction_value],
                 'num_cds_purchased': [num_cds_purchased]
             })
 
-            # Process the user input data
             # Convert 'transaction_date' to datetime64 format
             user_input_df['transaction_date'] = pd.to_datetime(user_input_df['transaction_date'], format='%Y%m%d')
 
-            df_RFM = user_input_df.groupby('customer_id').agg({
-                'transaction_date': lambda x: (end_date - x.max()).days,
-                'transaction_value': ['count', 'sum']
-            })
+            # Assuming 'end_date' is already defined based on your previous code
+            # Calculate Recency, Frequency, and Monetary
+            # df_RFM = user_input_df.agg({
+            #     'transaction_date': lambda x: (end_date - x.max()).days,
+            #     'transaction_value': ['count', 'sum']
+            # })
+            # #-------
 
-            df_RFM.columns = ['Recency', 'Frequency', 'Monetary']
+            # df_RFM.columns = ['Recency', 'Frequency', 'Monetary']
+            df_RFM = user_input_df.agg({
+                'transaction_date': lambda x: (end_date - x.max()).days,
+                'transaction_value': 'sum'  # Calculate the sum of transaction_value
+            })
+            df_RFM.columns = ['Recency', 'Monetary']
+            df_RFM['Frequency'] = user_input_df['transaction_value'].count()  # Calculate the count of transactions
 
             # Load the K-Means model
             kmeans_model = joblib.load("kmeans_model.pkl")
 
             # Predict cluster for the user's data
-            user_clusters = kmeans_model.predict(df_RFM)
+            #user_clusters = kmeans_model.predict(df_RFM)
+            user_clusters = kmeans_model.predict(df_RFM.values.reshape(1, -1))
             
             # Add the predicted cluster to the df_RFM DataFrame
             df_RFM['Cluster'] = user_clusters
