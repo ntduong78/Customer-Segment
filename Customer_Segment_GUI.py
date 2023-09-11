@@ -27,8 +27,10 @@ import os
 from datetime import datetime
 import joblib
 import re
+
 pio.templates.default = 'plotly' 
 
+transactions = []
 # Define the global current_date variable
 current_date = datetime.now()
 
@@ -850,111 +852,219 @@ elif selected_option == 'Model Selection':
     In summary, the K-Means clustering model is the preferred choice for making predictions due to its efficient training and competitive performance.
     """)
 
-
-elif selected_option == 'New Prediction':
+elif selected_option == "New Prediction":
     st.subheader("New Prediction")
-    
-    valid_input = False
+    # Initialize the session state to store transaction data
+    if 'transactions' not in st.session_state:
+        st.session_state.transactions = pd.DataFrame(columns=['transaction_date', 'num_cds_purchased', 'transaction_value'])
 
-    while not valid_input:
-        #customer_id = st.text_input(label="Enter Customer ID:", key="customer_id_input")
-        transaction_date = st.text_input(label="Enter Transaction Date (19970101 to 19980630, YYYYMMDD):", key="transaction_date_input")
-        num_cds_purchased = st.number_input(label="Enter Number of CDs Purchased:", min_value=1, step=1, key="num_cds_purchased_input")
-        transaction_value = st.number_input(label="Enter Transaction Value (greater than 0.0):", min_value=0.01, format="%.2f", key="transaction_value_input")
+    # Create a radio button for selecting data input option
+    data_input_option = st.radio("Select Data Input Option", ("Input Data", "Load Data"), index=0)  # Default to "Input Data"
+    start_date = pd.Timestamp(datetime(1997, 1, 1))
+    end_date = pd.Timestamp(datetime(1998, 6, 30))
+    # Check the selected option
+    if data_input_option == "Input Data":
+        with st.form('Input_Data'):
+            # User input fields
+            transaction_date = st.date_input("Transaction Date", end_date)
+            cds_purchased = st.number_input("Number of CDs Purchased", min_value=1, step=1, format="%d")
+            transaction_value = st.number_input("Transaction Value ($)", min_value=10.0, step=0.50)
 
-        # Validate transaction_date format and range
-        # Define the date range
-        start_date = pd.Timestamp('1997-01-01')
-        end_date = pd.Timestamp('1998-06-30')
+            # Perform validation
+            transaction_date = pd.Timestamp(transaction_date)  # Convert to Pandas Timestamp
+            valid_date = start_date <= transaction_date <= end_date
+            # Check if the transaction date is within the specified range
+            valid_cds = isinstance(cds_purchased, int) and cds_purchased > 0
+            valid_amount = isinstance(transaction_value, float) and transaction_value > 0.0
 
-        # Validate transaction_date within the specified range
-        valid_date = False
-        try:
-            transaction_date = pd.to_datetime(str(transaction_date), format='%Y%m%d')
-            if start_date <= transaction_date <= end_date:
-                valid_date = True
-        except ValueError:
-            st.warning("Please enter a valid transaction date in the format YYYYMMDD and in range 19970101 to 19980630.")
-            st.stop()
+            # Check if the form is submitted
+            if st.form_submit_button('Submit'):
+                if not valid_date:
+                    st.warning(f"Transaction date must be between {start_date.date()} and {end_date.date()}.")
+                elif not valid_cds:
+                    st.warning("Number of CDs should be greater than 0")
+                elif not valid_amount:
+                    st.warning("Transaction value should be greater than 0")
+                else:
+                    if valid_date and valid_cds and valid_amount:
+                        # Create a new DataFrame with the user's input
+                        new_transaction = pd.DataFrame({
+                            'transaction_date': [transaction_date],
+                            'num_cds_purchased': [cds_purchased],
+                            'transaction_value': [transaction_value]
+                        })
 
-        # Validate customer_id
-        # valid_customer_id = False
-        # if re.match(r'^\d{1,5}$', customer_id):
-        #     valid_customer_id = True
-        # else:
-        #     st.warning("Customer ID should be a numeric string with a maximum of 5 characters.")
+                        # Append the new transaction data to the session state transactions DataFrame
+                        st.session_state.transactions = pd.concat([st.session_state.transactions, new_transaction], ignore_index=True)
+                        st.success("Transaction added successfully!")
+        
+        # Create a checkbox for the reset action
+        reset_data = st.toggle("Reset Transactions")
+        # Check if the reset checkbox is selected
+        if reset_data:
+            st.session_state.transactions = pd.DataFrame(columns=['transaction_date', 'num_cds_purchased', 'transaction_value'])
+            st.success("Transactions cleared!")
+
+        if not st.session_state.transactions.empty: 
+            # Display the current transactions DataFrame
+            st.subheader("Current Transactions")
+            st.write(st.session_state.transactions)
+            # # Assuming that 'Transaction Date' is a column in the DataFrame st.session_state.transactions
+            # max_transaction_date = st.session_state.transactions['transaction_date'].max()
+            # recency = (end_date - max_transaction_date).days
+            # st.write("Recency: ",recency)
+
+            # # Display the maximum transaction date
+            # st.write(f"Max Transaction Date: {max_transaction_date}")
 
 
-        # Validate num_cds_purchased and transaction_value
-        valid_values = True
-        if num_cds_purchased < 1:
-            st.warning("Number of CDs purchased should be greater than or equal to 1.")
-            valid_values = False
-        if transaction_value <= 0:
-            st.warning("Transaction value should be greater than 0.0.")
-            valid_values = False
+        # Create a button to Customer Segment
+        if st.button("Customer Segment"):
+            if not st.session_state.transactions.empty:
+                user_input_df = st.session_state.transactions
+                user_input_df['customer_id'] = '00001'
+                df_RFM = user_input_df.groupby('customer_id').agg({
+                    'transaction_date': lambda x: (end_date - x.max()).days,
+                    'transaction_value': ['count', 'sum']
+                })
 
-        #if not valid_date or not valid_customer_id or not valid_values:
-        if not valid_date or not valid_values:
-            st.warning("Please fill in all fields with valid values.")
-        else:
-            valid_input = True
+                df_RFM.columns = ['Recency', 'Frequency', 'Monetary']
 
-    # Only display the "Submit" button if input is valid
-    if valid_input:
-        if st.button("Submit"):
-            # Create a DataFrame from the user's input
-            # user_input_df = pd.DataFrame({
-            #     'customer_id': [customer_id],
-            #     'transaction_date': [transaction_date],
-            #     'transaction_value': [transaction_value],
-            #     'num_cds_purchased': [num_cds_purchased]
-            # })
+                st.dataframe(df_RFM)
+                kmeans_model = joblib.load("kmeans_model.pkl")
+                user_clusters = kmeans_model.predict(df_RFM[['Recency', 'Frequency', 'Monetary']])
+                # Format the message as a single string
+                success_message = f"Predicted Clusters: {user_clusters}"
 
-            # # Process the user input data
-            # # Convert 'transaction_date' to datetime64 format
-            # user_input_df['transaction_date'] = pd.to_datetime(user_input_df['transaction_date'], format='%Y%m%d')
-
-            # df_RFM = user_input_df.groupby('customer_id').agg({
-            #     'transaction_date': lambda x: (end_date - x.max()).days,
-            #     'transaction_value': ['count', 'sum']
-            # })
-
-            user_input_df = pd.DataFrame({
-                'transaction_date': [transaction_date],
-                'transaction_value': [transaction_value],
-                'num_cds_purchased': [num_cds_purchased]
-            })
-
+                # Display the success message
+                st.success(success_message)
+            else:
+                st.warning("No transactions to process.")
+    else:
+        # Add code to load data from a file when "Load Data" is selected
+        # You can use st.file_uploader or any other method to load data
+        # Upload file
+        uploaded_file = st.file_uploader("Choose a file", type=['txt','csv'])
+        #st.write(uploaded_file.name)
+        if uploaded_file is not None:
+            file_name = uploaded_file.name
+            # Load and preprocess the data
+            df = load_data(file_name)
+            st.success(f"{len(df)} transactions are loaded successfully")
             # Convert 'transaction_date' to datetime64 format
-            user_input_df['transaction_date'] = pd.to_datetime(user_input_df['transaction_date'], format='%Y%m%d')
+            df['transaction_date'] = pd.to_datetime(df['transaction_date'], format='%Y%m%d')
+       
+        if st.button("Customer Segment"):
+            df_RFM = df.groupby('customer_id').agg({
+                    'transaction_date': lambda x: (end_date - x.max()).days,
+                    'transaction_value': ['count', 'sum']
+                })
 
-            # Assuming 'end_date' is already defined based on your previous code
-            # Calculate Recency, Frequency, and Monetary
-            # df_RFM = user_input_df.agg({
-            #     'transaction_date': lambda x: (end_date - x.max()).days,
-            #     'transaction_value': ['count', 'sum']
-            # })
-            # #-------
+            df_RFM.columns = ['Recency', 'Frequency', 'Monetary']
+            # Select the columns to use for clustering
+            rfm_selected = df_RFM[['Recency', 'Frequency', 'Monetary']]
 
-            # df_RFM.columns = ['Recency', 'Frequency', 'Monetary']
-            df_RFM = user_input_df.agg({
-                'transaction_date': lambda x: (end_date - x.max()).days,
-                'transaction_value': 'sum'  # Calculate the sum of transaction_value
-            })
-            df_RFM.columns = ['Recency', 'Monetary']
-            df_RFM['Frequency'] = user_input_df['transaction_value'].count()  # Calculate the count of transactions
+            # Scale the features
+            scaler = StandardScaler()
+            rfm_scaled = scaler.fit_transform(rfm_selected)
 
-            # Load the K-Means model
+            
+            # Build the K-Means model with the specified number of clusters
             kmeans_model = joblib.load("kmeans_model.pkl")
+            new_cluster_labels  = kmeans_model.predict(rfm_scaled)
 
-            # Predict cluster for the user's data
-            #user_clusters = kmeans_model.predict(df_RFM)
-            user_clusters = kmeans_model.predict(df_RFM.values.reshape(1, -1))
-            
-            # Add the predicted cluster to the df_RFM DataFrame
-            df_RFM['Cluster'] = user_clusters
-            
-            st.write("Predicted Cluster:", user_clusters[0])
- 
+            # Add cluster labels to the DataFrame
+            df_RFM['Cluster'] = new_cluster_labels
 
+            # Display segmentation results
+            st.write("##### KMeans Customer Segmentation Sample Results")
+            st.dataframe(df_RFM)
+
+            # Write result clustering to csv
+            df_RFM.to_csv('prediction_result_data.csv', index=False)
+
+
+            # Calculate average values for each cluster
+            rfm_agg2 = df_RFM.groupby('Cluster').agg({
+                'Recency': 'mean',
+                'Frequency': 'mean',
+                'Monetary': ['mean', 'count']}).round(0)
+
+            rfm_agg2.columns = rfm_agg2.columns.droplevel()
+            rfm_agg2.columns = ['RecencyMean', 'FrequencyMean', 'MonetaryMean', 'Count']
+            rfm_agg2['Percent'] = round((rfm_agg2['Count'] / rfm_agg2.Count.sum()) * 100, 2)
+
+            # Reset the index
+            rfm_agg2 = rfm_agg2.reset_index()
+
+            # Change the Cluster column's datatype into discrete values
+            rfm_agg2['Cluster'] = 'Cluster ' + rfm_agg2['Cluster'].astype('str')
+            st.write("##### KMeans Customer Segmentation Results")
+            st.dataframe(rfm_agg2)
+
+            # #Visualization
+            # # Get cluster centroids
+            # centroids = kmeans_model.cluster_centers_
+
+            # # Create a scatter plot
+            # fig, ax = plt.subplots(figsize=(8, 6))
+
+            # # Plot data points
+            # scatter = ax.scatter(df_RFM['Recency'], df_RFM['Frequency'], c=df_RFM['Cluster'], cmap='viridis', label='Data Points')
+
+            # # Plot cluster centroids
+            # ax.scatter(centroids[:, 0], centroids[:, 1], c='red', marker='X', s=200, label='Cluster Centroids')
+
+            # ax.set_title('Cluster Visualization with Centroids')
+            # ax.set_xlabel('Recency')
+            # ax.set_ylabel('Frequency')
+            # ax.legend()
+
+            # # Display the plot in Streamlit
+            # st.pyplot(fig)
+
+            # Create a separate figure for the tree map
+            fig1, ax_1 = plt.subplots(figsize=(14, 10))
+
+            colors_dict2 = {'Cluster0': 'yellow', 'Cluster1': 'royalblue', 'Cluster2': 'cyan',
+                            'Cluster3': 'red', 'Cluster4': 'purple', 'Cluster5': 'green', 'Cluster6': 'gold'}
+
+            squarify.plot(sizes=rfm_agg2['Count'],
+                        text_kwargs={'fontsize': 12, 'weight': 'bold', 'fontname': "sans serif"},
+                        color=colors_dict2.values(),
+                        label=['{} \n{:.0f} days \n{:.0f} orders \n{:.0f} $ \n{:.0f} customers ({}%)'.format(*rfm_agg2.iloc[i])
+                                for i in range(0, len(rfm_agg2))], alpha=0.5)
+
+            plt.title("Customers Segments Tree Map", fontsize=26, fontweight="bold")
+            plt.axis('off')
+
+            # Save the tree map as an image file
+            fig1.savefig("result_tree_map.png", bbox_inches='tight')
+
+            # Display the saved tree map using st.image
+            st.image("result_tree_map.png")
+
+            # Create a color scale (e.g., viridis, rainbow, jet, etc.)
+            color_scale = px.colors.sequential.Viridis  # You can change this to your preferred color scale
+
+            # Scatter plot with the chosen color scale
+            fig2 = px.scatter(rfm_agg2, x="RecencyMean", y="MonetaryMean", size="FrequencyMean", color="Cluster",
+                            hover_name="Cluster", size_max=100, color_continuous_scale=color_scale)
+
+            # Save the scatter plot as an image file using Plotly's to_image method
+            scatter_image = pio.to_image(fig2, format="png", width=800, height=600, scale=1)
+
+            # Save the image to a file
+            with open("results_scatter_plot.png", "wb") as img_file:
+                img_file.write(scatter_image)
+
+            st.write("##### Customer Segments Scatter Plot")
+            # Display the saved scatter plot using st.image
+            st.image("results_scatter_plot.png")
+            
+
+
+
+
+
+            
