@@ -11,3 +11,4 @@ pyspark
 datetime
 joblib
 kaleido
+tempfile
