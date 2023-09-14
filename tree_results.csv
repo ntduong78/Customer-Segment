@@ -1,3 +1,5 @@
-Cluster,RecencyMean,FrequencyMean,MonetaryMean,Count,Percent
-Cluster 0,163.0,6.0,215.0,9133,38.86
-Cluster 1,496.0,1.0,38.0,14369,61.14
+Cluster,RecencyMean,FrequencyMean,MonetaryMean,Count,Percent,Number of Clusters
+Cluster 0,41.0,39.0,1947.0,140,0.6,4
+Cluster 1,60.0,12.0,516.0,1371,5.83,4
+Cluster 2,184.0,4.0,129.0,7622,32.43,4
+Cluster 3,496.0,1.0,38.0,14369,61.14,4

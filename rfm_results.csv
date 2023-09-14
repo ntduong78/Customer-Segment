@@ -1,3 +1,5 @@
-RFM_level,RecencyMean,FrequencyMean,MonetaryMean,Count,Percent
-Lost Customers,491.0,1.0,32.0,13925,59.25
-Active Customers,186.0,6.0,214.0,9577,40.75
+RFM_level,RecencyMean,FrequencyMean,MonetaryMean,Count,Percent,Number of Clusters
+Regular,381.0,2.0,70.0,9035,38.44,4
+Lost,506.0,1.0,20.0,8600,36.59,4
+VIP Customers,71.0,9.0,383.0,3469,14.76,4
+Potential Loyalists,241.0,5.0,153.0,2398,10.2,4
