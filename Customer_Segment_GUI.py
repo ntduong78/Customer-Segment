@@ -26,7 +26,7 @@ from PIL import Image
 import os
 from datetime import datetime
 import joblib
-import re
+import tempfile
 
 pio.templates.default = 'plotly' 
 
@@ -126,15 +126,76 @@ def prepare_data(df):
 
     return df_RFM, current_date
 
-def rfm_level2(df):
-    if (df['RFM_score'] == 12):
-        return 'VIP Customers'
-    elif (df['R'] >= 2 and df['F'] == 4):
-        return 'Potential Loyalists'
-    elif (df['F'] <= 2 and df['M'] <= 2 and df['R'] <= 2):
-        return 'Lost'
-    else:
-        return 'Regular'
+    
+def rfm_level2(df, num_clusters):
+    if num_clusters == 2:
+        if (df['RFM_score'] >= 9):
+            return 'Active Customers'
+        else:
+            return 'Lost Customers'
+    
+    if num_clusters == 3:
+        if (df['RFM_score'] == 12):
+            return 'VIP Customers'
+    
+        elif (df['R'] >= 3):
+            return 'Active Customers'
+        else:
+            return 'Lost Customers'
+    
+    if num_clusters == 4:
+        if (df['RFM_score'] == 12):
+            return 'VIP Customers'
+        elif (df['R'] >= 2 and df['F'] == 4):
+            return 'Potential Loyalists'
+        elif (df['F'] <= 2 and df['M'] <= 2 and df['R'] <= 2):
+            return 'Lost'
+        else:
+            return 'Regular'
+        
+    elif num_clusters == 5:
+        # Define conditions for 5 clusters
+        # Add more conditions as needed
+        if (df['RFM_score'] == 12):
+            return 'Group 1'
+        elif (df['R'] == 4):
+            return 'Group 2'
+        elif (df['M'] == 4):
+            return 'Group 3'
+        elif (df['F'] == 4):
+            return 'Group 4'
+        else:
+            return 'Group 5'
+    elif num_clusters == 6:
+        # Define conditions for 6 clusters
+        if (df['RFM_score'] == 12):
+            return 'Group 1'
+        elif (df['R'] == 1 and (df['F'] == 1 and df['M'] == 1)):
+            return 'Group 2'
+        elif (df['M'] == 4):
+            return 'Group 3'
+        elif (df['R'] >= 3 and df['M'] >= 3):
+            return 'Group 4'
+        elif (df['F'] >= 3 and df['R'] >= 3):
+            return 'Group 5'
+        else:
+            return 'Group 6'
+    elif num_clusters == 7:
+        if (df['RFM_score'] == 12):
+            return 'Group 1'
+        elif (df['R'] == 4):
+              return 'Group 2'
+        elif (df['F'] <= 2 and df['M'] <= 2):
+            return 'Group 3'
+        elif (df['M'] == 4):
+            return 'Group 4'
+        elif (df['R'] >= 3 and df['F'] <= 2):
+            return 'Group 5'
+        elif (df['F'] >= 3 and df['R'] >= 2):
+            return 'Group 6'
+        else:
+            return 'Group 7'
+
     
 def rfm_level1(df):
     if (df['RFM_score'] == 12):
@@ -208,10 +269,11 @@ def perform_rfm_analysis(df_RFM,num_clusters=2):
 
     start_time = time.time()
     df_RFM['RFM_score'] = df_RFM[['R', 'F', 'M']].sum(axis=1)
-    if num_clusters == 2:
-        df_RFM['RFM_level'] = df_RFM.apply(rfm_level, axis=1)
-    else:
-        df_RFM['RFM_level'] = df_RFM.apply(rfm_level1, axis=1)
+    df_RFM['RFM_level'] = df_RFM.apply(lambda row: rfm_level2(row, num_clusters), axis=1)
+    # if num_clusters == 2:
+    #     df_RFM['RFM_level'] = df_RFM.apply(rfm_level, axis=1)
+    # else:
+    #     df_RFM['RFM_level'] = df_RFM.apply(rfm_level1, axis=1)
 
     rfm_agg = df_RFM.groupby('RFM_level').agg({
         'Recency': 'mean',
@@ -247,9 +309,9 @@ def perform_rfm_analysis(df_RFM,num_clusters=2):
     plt.title("RFM Customer Segments Tree Map", fontsize=26, fontweight="bold")
     plt.axis('off')
     
-    fig2.savefig('rfm_tree_map.png',bbox_inches='tight')  # Save the figure
+    fig2.savefig(f'rfm_tree_map_{num_clusters}_clusters.png',bbox_inches='tight')  # Save the figure
     st.write("##### RFM Customer Segments Tree Map")
-    st.image("rfm_tree_map.png")  # Display the saved image
+    st.image(f"rfm_tree_map_{num_clusters}_clusters.png")  # Display the saved image
 
      # Create a color scale (e.g., viridis, rainbow, jet, etc.)
     color_scale = px.colors.sequential.Viridis  # You can change this to your preferred color scale
@@ -263,11 +325,14 @@ def perform_rfm_analysis(df_RFM,num_clusters=2):
     #fig3.write_image("RFM_Scatter.png")  # Save the scatter plot as an image
     st.write("##### RFM Customer Segments Scatter Plot")
     # Save the image to a file
-    scatter_image_file = "rfm_scatter_plot.png"
+    scatter_image_file = f"rfm_scatter_plot_{num_clusters}_clusters.png"
     with open(scatter_image_file, "wb") as img_file:
         img_file.write(scatter_image)
 
     st.image(scatter_image_file)
+    
+    # Add a new column "Number of Clusters" to result_data
+    rfm_results["Number of Clusters"] = num_clusters
 
     return rfm_results, time_taken
 
@@ -304,7 +369,7 @@ def build_kmeans_model(data, k):
     kmeans.fit_predict(data)
     
     # Save the K-Means model to a file
-    joblib.dump(kmeans, 'kmeans_model.pkl')
+    joblib.dump(kmeans, f'kmeans_model_{k}_clusters.pkl')
 
     return kmeans
 
@@ -336,18 +401,25 @@ def perform_kmeans_clustering(df_RFM, num_clusters=2):
 
     start_time = time.time()  # Start timing the function
 
-    # Build the K-Means model with the specified number of clusters
-    kmeans = build_kmeans_model(rfm_scaled, num_clusters)
+    # # Build the K-Means model with the specified number of clusters
+    # kmeans = build_kmeans_model(rfm_scaled, num_clusters)
+    # # Create a new DataFrame with the original data and cluster assignments
+    # clustered_data = pd.DataFrame({'customer_id': df_RFM.index, 'Cluster': kmeans.labels_})
 
+    # Build the K-Means model with the specified number of clusters
+    kmeans = joblib.load(f"kmeans_model_{num_clusters}_clusters.pkl")
+    clustered_data  = kmeans.predict(rfm_scaled)
+
+    # Convert clustered_data NumPy array to a DataFrame
+    clustered_data_df = pd.DataFrame({'customer_id': df_RFM.index, 'Cluster': kmeans.labels_})
+    
     # End timing and calculate the time taken
     end_time = time.time()
     time_taken = end_time - start_time
 
-    # Create a new DataFrame with the original data and cluster assignments
-    clustered_data = pd.DataFrame({'customer_id': df_RFM.index, 'Cluster': kmeans.labels_})
 
     # Merge with the original data
-    result_data = pd.merge(rfm_selected, clustered_data, left_index=True, right_on='customer_id')
+    result_data = pd.merge(rfm_selected, clustered_data_df, left_index=True, right_on='customer_id')
     # Write result clustering to csv
     result_data.to_csv('result_data.csv', index=False)
 
@@ -393,10 +465,10 @@ def perform_kmeans_clustering(df_RFM, num_clusters=2):
     plt.axis('off')
 
     # Save the tree map as an image file
-    fig1.savefig("kmeans_tree_map.png", bbox_inches='tight')
+    fig1.savefig(f"kmeans_tree_map_{num_clusters}_clusters.png", bbox_inches='tight')
 
     # Display the saved tree map using st.image
-    st.image("kmeans_tree_map.png")
+    st.image(f"kmeans_tree_map_{num_clusters}_clusters.png")
 
     # Create a color scale (e.g., viridis, rainbow, jet, etc.)
     color_scale = px.colors.sequential.Viridis  # You can change this to your preferred color scale
@@ -409,12 +481,15 @@ def perform_kmeans_clustering(df_RFM, num_clusters=2):
     scatter_image = pio.to_image(fig2, format="png", width=800, height=600, scale=1)
 
     # Save the image to a file
-    with open("kmeans_scatter_plot.png", "wb") as img_file:
+    with open(f"kmeans_scatter_plot_{num_clusters}_clusters.png", "wb") as img_file:
         img_file.write(scatter_image)
 
     st.write("##### KMeans Customer Segments Scatter Plot")
     # Display the saved scatter plot using st.image
-    st.image("kmeans_scatter_plot.png")
+    st.image(f"kmeans_scatter_plot_{num_clusters}_clusters.png")
+    
+    # Add a new column "Number of Clusters" to result_data
+    rfm_agg2["Number of Clusters"] = num_clusters
 
     return rfm_agg2, time_taken, silhouette_avg
 
@@ -531,10 +606,10 @@ def perform_pyspark_kmeans_clustering(df_RFM, num_clusters=4):
     plt.axis('off')
 
     # Save the tree map as an image file
-    fig1.savefig("py_kmeans_tree_map.png", bbox_inches='tight')
+    fig1.savefig(f"py_kmeans_tree_map_{num_clusters}_clusters.png", bbox_inches='tight')
 
     # Display the saved image using st.image
-    st.image("py_kmeans_tree_map.png")
+    st.image(f"py_kmeans_tree_map_{num_clusters}_clusters.png")
 
     # Create a color scale (e.g., viridis, rainbow, jet, etc.)
     color_scale = px.colors.sequential.Viridis  # You can change this to your preferred color scale
@@ -550,14 +625,14 @@ def perform_pyspark_kmeans_clustering(df_RFM, num_clusters=4):
     scatter_image = pio.to_image(scatter_fig, format="png", width=800, height=600, scale=1)
 
     # Save the image to a file
-    scatter_image_file = "hierarchical_scatter_plot.png"
+    scatter_image_file = f"hierarchical_scatter_plot_{num_clusters}_clusters.png"
     with open(scatter_image_file, "wb") as img_file:
         img_file.write(scatter_image)
 
     st.image(scatter_image_file)
 
     # Save the KMeans model
-    kmeans_model.save("pyspark_kmeans_model")
+    kmeans_model.save(f"pyspark_kmeans_model_{num_clusters}_cluster.pkl")
 
     return rfm_agg2_pandas_sorted, execution_time, silhouette
 
@@ -586,8 +661,13 @@ def perform_hierarchical_clustering(df_RFM, num_clusters=2):
     
     # Fit Hierarchical Clustering model
     start_time = time.time()  # Start timing the model fitting
-    agg_clustering = AgglomerativeClustering(n_clusters=num_clusters, affinity='euclidean', linkage='ward')
+    # agg_clustering = AgglomerativeClustering(n_clusters=num_clusters, affinity='euclidean', linkage='ward')
+    
+    
+    # Load the Hierachical model with the specified number of clusters
+    agg_clustering = joblib.load(f"hierarchical_clustering_model_{num_clusters}_clusters.pkl")
     cluster_assignments = agg_clustering.fit_predict(rfm_scaled)
+
     end_time = time.time()  # End timing the model fitting
 
     execution_time = end_time - start_time  # Calculate execution time
@@ -638,9 +718,9 @@ def perform_hierarchical_clustering(df_RFM, num_clusters=2):
     plt.axis('off')
 
     # Save the tree map as an image file
-    squarify_fig.savefig("hierarchical_tree_map.png", bbox_inches='tight')
+    squarify_fig.savefig(f"hierarchical_tree_map_{num_clusters}_clusters.png", bbox_inches='tight')
     st.write("###### Hierachical Clustering Tree Map")
-    st.image("hierarchical_tree_map.png")
+    st.image(f"hierarchical_tree_map_{num_clusters}_clusters.png")
 
     # Create a color scale (e.g., viridis, rainbow, jet, etc.)
     color_scale = px.colors.sequential.Viridis  # You can change this to your preferred color scale
@@ -655,42 +735,106 @@ def perform_hierarchical_clustering(df_RFM, num_clusters=2):
     scatter_image = pio.to_image(scatter_fig, format="png", width=800, height=600, scale=1)
 
     # Save the image to a file
-    scatter_image_file = "hierarchical_scatter_plot.png"
+    scatter_image_file = f"hierarchical_scatter_plot_{num_clusters}_clusters.png"
     with open(scatter_image_file, "wb") as img_file:
         img_file.write(scatter_image)
 
     st.image(scatter_image_file)
 
     # Save the Hierarchical Clustering model to a file
-    with open("hierarchical_clustering_model.pkl", "wb") as model_file:
+    with open(f"hierarchical_clustering_model_{num_clusters}_clusters.pkl", "wb") as model_file:
         pickle.dump(agg_clustering, model_file)
+
+    # Add a new column "Number of Clusters" to result_data
+    rfm_agg3["Number of Clusters"] = num_clusters
 
     # Return results
     return rfm_agg3, execution_time, silhouette
 
 # Define a function to update or add records in global_results_df
 
-def update_global_results(model_name, execution_time, silhouette_score, csv_filename='comparison.csv'):
+def update_global_results(num_clusters, model_name, execution_time, silhouette_score, csv_filename='comparison.csv'):
     # Load the existing comparison data from the CSV file
     try:
         global_results_df = pd.read_csv(csv_filename)
     except FileNotFoundError:
         # If the file doesn't exist, create an empty DataFrame
-        global_results_df = pd.DataFrame(columns=["Model", "Execution Time (s)", "Silhouette Score"])
+        global_results_df = pd.DataFrame(columns=["Number of Clusters", "Model", "Execution Time (s)", "Silhouette Score"])
 
-    # Check if the model name already exists in the DataFrame
-    existing_index = global_results_df[global_results_df["Model"] == model_name].index
+    # # Check if the model name already exists in the DataFrame
+    # existing_index = global_results_df[global_results_df["Model"] == model_name].index
+
+    # Check if the combination of model name and "Number of Clusters" exists
+    existing_index = global_results_df[
+        (global_results_df["Model"] == model_name) & (global_results_df["Number of Clusters"] == num_clusters)
+    ].index
 
     if not existing_index.empty:
         # Replace the existing record with the same model name
         global_results_df.loc[existing_index, ["Execution Time (s)", "Silhouette Score"]] = [execution_time, silhouette_score]
     else:
         # Add a new record for the model
-        new_record = {"Model": model_name, "Execution Time (s)": execution_time, "Silhouette Score": silhouette_score}
+        new_record = {"Number of Clusters": num_clusters,"Model": model_name, "Execution Time (s)": execution_time, "Silhouette Score": silhouette_score}
         global_results_df = pd.concat([global_results_df, pd.DataFrame([new_record])], ignore_index=True)
 
     # Save the updated DataFrame to the CSV file
     global_results_df.to_csv(csv_filename, index=False)
+
+def process_uploaded_file(uploaded_file):
+    # Create empty lists to store column data
+    customer_ids = []
+    transaction_dates = []
+    num_cds_purchased = []
+    transaction_values = []
+
+    try:
+        # Save the uploaded file to a temporary location
+        with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+            temp_file.write(uploaded_file.read())
+            temp_file_path = temp_file.name
+
+        # Reset the file pointer to the beginning
+        uploaded_file.seek(0)
+
+        # Read the temporary file line by line and split values by whitespace
+        with open(temp_file_path, 'r') as file:
+            for line in file:
+                values = line.strip().split()
+                if len(values) == 4:  # Check for 4 columns in your data
+                    # Assign values to respective columns
+                    customer_ids.append(values[0])
+                    transaction_dates.append(pd.to_datetime(values[1], format='%Y%m%d'))  # Assuming date is in the third column
+                    num_cds_purchased.append(pd.to_numeric(values[2]))  # Assuming quantity is in the fourth column
+                    transaction_values.append(pd.to_numeric(values[3]))  # Assuming value is in the fifth column
+                if len(values) == 5:  # Check for 4 columns in your data
+                    # Assign values to respective columns
+                    customer_ids.append(values[0])
+                    transaction_dates.append(pd.to_datetime(values[2], format='%Y%m%d'))  # Assuming date is in the third column
+                    num_cds_purchased.append(pd.to_numeric(values[3]))  # Assuming quantity is in the fourth column
+                    transaction_values.append(pd.to_numeric(values[4]))  # Assuming value is in the fifth column
+        # Create a DataFrame from the lists
+        df = pd.DataFrame({
+            'customer_id': customer_ids,
+            'transaction_date': transaction_dates,
+            'num_cds_purchased': num_cds_purchased,
+            'transaction_value': transaction_values
+        })
+
+        # Display a sample of the loaded data
+        st.subheader("Sample of Loaded Data:")
+        st.write(df.head())
+
+        # Save the DataFrame to a new tab-separated text file
+        df.to_csv("CDNOW_master_new.txt", sep='\t', index=False)
+
+    except FileNotFoundError:
+        st.warning("Uploaded file not found.")
+
+    finally:
+        # Delete the temporary file after reading
+        os.remove(temp_file_path)
+    
+    return df
 
 # Create a global DataFrame to store results
 global_results_df = pd.DataFrame(columns=["Model", "Execution Time (s)", "Silhouette Score"])
@@ -718,15 +862,28 @@ elif selected_option == 'Build Project':
     
     # Upload file
     uploaded_file = st.file_uploader("Choose a file", type=['txt'])
-    #st.write(uploaded_file.name)
+
     if uploaded_file is not None:
-        file_name = uploaded_file.name
-        # Load and preprocess the data
-        df = load_data(file_name)
-        df.to_csv("CDNOW_master_new.txt", index=False)
-    st.write(df.shape)
-    # Create a dropdown or radio button widget to select the number of clusters
-    num_clusters = st.radio("Select Number of Clusters", [2, 3])
+        df = process_uploaded_file(uploaded_file)
+        st.success(f"{len(df)} transactions are loaded successfully")
+    else:
+        st.info("There is no file uploaded. Default master data file is used to build project")
+
+    #------------------
+    # # Create a dropdown or radio button widget to select the number of clusters
+    # num_clusters = st.radio("Select Number of Clusters", [2, 3])
+    # Create a text input for the number of clusters
+    num_clusters = st.text_input("Enter Number of Clusters", "3")  # Default value is "3"
+
+    # Convert the input to an integer
+    num_clusters = int(num_clusters)  # Assuming the input is a valid integer
+
+    # Check if the input is within the range of 2 to 7
+    if 2 <= num_clusters <= 7:
+        st.success(f"Number of Clusters: {num_clusters}")
+    else:
+        st.error("Please enter a value between 2 and 7 for the number of clusters.")
+
 
     st.subheader("Build Project")
 
@@ -741,11 +898,11 @@ elif selected_option == 'Build Project':
         rfm_results, rfm_time = perform_rfm_analysis(df_RFM,num_clusters)
         
         # Call the function to update or add the record
-        update_global_results("RFM Analysis", rfm_time, 0)
+        update_global_results(num_clusters,"RFM Analysis", rfm_time, 0)
 
         # Define the file path where you want to save the CSV file
         csv_file_path = "rfm_results.csv"
-
+       
         # Use the to_csv method to write the DataFrame to a CSV file
         rfm_results.to_csv(csv_file_path, index=False)
 
@@ -754,7 +911,7 @@ elif selected_option == 'Build Project':
         rfm_selected = df_RFM[['Recency','Frequency','Monetary']]
         kmeans_results, kmean_time, kmean_silhouette  = perform_kmeans_clustering(rfm_selected,num_clusters)
         
-        update_global_results("KMean Clustering", kmean_time, kmean_silhouette)
+        update_global_results(num_clusters,"KMean Clustering", kmean_time, kmean_silhouette)
 
         # Define the file path where you want to save the CSV file
         csv_file_path = "kmeans_results.csv"
@@ -764,99 +921,127 @@ elif selected_option == 'Build Project':
 
         
     # # Perform Hierachical Clustering
-    # if st.button("Perform Hierachical Clustering",key="tree"):
-    #     rfm_selected = df_RFM[['Recency','Frequency','Monetary']]
-    #     tree_results, tree_time, tree_silhouette = perform_hierarchical_clustering(rfm_selected,num_clusters)
-    #     update_global_results("Hierachical Clustering", tree_time, tree_silhouette)
-    #     # Define the file path where you want to save the CSV file
-    #     csv_file_path = "tree_results.csv"
+    if st.button("Perform Hierachical Clustering",key="tree"):
+        rfm_selected = df_RFM[['Recency','Frequency','Monetary']]
+        tree_results, tree_time, tree_silhouette = perform_hierarchical_clustering(rfm_selected,num_clusters)
+        update_global_results(num_clusters,"Hierachical Clustering", tree_time, tree_silhouette)
+        # Define the file path where you want to save the CSV file
+        csv_file_path = "tree_results.csv"
 
-    #     # Use the to_csv method to write the DataFrame to a CSV file
-    #     tree_results.to_csv(csv_file_path, index=False)
+        # Use the to_csv method to write the DataFrame to a CSV file
+        tree_results.to_csv(csv_file_path, index=False)
 
     # # Perform K-Means clustering pyspark
     # if st.button("Perform Pyspark K-Means Clustering"):
     #     rfm_selected = df_RFM[['Recency','Frequency','Monetary']]
     #     py_kmeans_results, py_kmean_time, py_kmean_silhouette  = perform_pyspark_kmeans_clustering(rfm_selected)
-    #     update_global_results("Pyspark KMeans Clustering", py_kmean_time, py_kmean_silhouette)
+    #     update_global_results(num_clusters,"Pyspark KMeans Clustering", py_kmean_time, py_kmean_silhouette)
 
 elif selected_option == 'Model Selection':
-      
-    # Check if the "comparison.csv" file exists
-    if os.path.isfile('comparison.csv'):
-        # Load the comparison data from the CSV file
-        comparison_df = pd.read_csv('comparison.csv')
+    # Add a slider to select the number of clusters (from 2 to 7)
+    num_clusters = st.slider("Select Number of Clusters", min_value=2, max_value=7, value=4)
 
-        # Check if there are records in the comparison DataFrame
-        if not comparison_df.empty:
-            # Display the comparison data
-            st.subheader("Model Selection")
-            st.write("##### Model Comparison")
-            st.dataframe(comparison_df)
+    # Add a "Select Model" button
+    if st.button("Select Model"):  
+        # Check if the "comparison.csv" file exists
+        if os.path.isfile('comparison.csv'):
+            # Load the comparison data from the CSV file
+            comparison_df = pd.read_csv('comparison.csv')
+            comparison_df = comparison_df[comparison_df["Number of Clusters"] == num_clusters]
+            comparison_df = comparison_df.drop("Number of Clusters", axis=1)
+            
+            # Check if there are records in the comparison DataFrame
+            if not comparison_df.empty:
+                # Display the comparison data
+                st.subheader("Model Selection")
+                st.write("##### Model Comparison")
+                st.dataframe(comparison_df)
+            else:
+                st.warning("No records found in the comparison data. Please select the 'Build Project' menu to generate results.")
         else:
-            st.warning("No records found in the comparison data. Please select the 'Build Project' menu to generate results.")
-    else:
-        st.warning("The 'comparision.csv' file does not exist. Please select the 'Build Project' menu to generate results.")
+            st.warning("The 'comparision.csv' file does not exist. Please select the 'Build Project' menu to generate results.")
 
-    st.write("##### Comparision of clustering results")
-    # Load individual CSV files and add model name column
-    rfm_results = pd.read_csv('rfm_results.csv')
-    kmeans_results = pd.read_csv('kmeans_results.csv')
-    tree_results = pd.read_csv('tree_results.csv')
+        # Load individual CSV files and add model name column
+        rfm_results = pd.read_csv('rfm_results.csv')
+        kmeans_results = pd.read_csv('kmeans_results.csv')
+        tree_results = pd.read_csv('tree_results.csv')
 
-    # Rename the 'RFM_Level' column to 'Cluster' in the rfm_results DataFrame
-    rfm_results = rfm_results.rename(columns={'RFM_level': 'Cluster'})
+        # Rename the 'RFM_Level' column to 'Cluster' in the rfm_results DataFrame
+        rfm_results = rfm_results.rename(columns={'RFM_level': 'Cluster'})
 
-    # Add model name columns
-    rfm_results['Model'] = 'RFM'
-    kmeans_results['Model'] = 'KMeans'
-    tree_results['Model'] = 'Hierarchical'
+        # Add model name columns
+        rfm_results['Model'] = 'RFM'
+        kmeans_results['Model'] = 'KMeans'
+        tree_results['Model'] = 'Hierarchical'
 
-    # Concatenate the DataFrames
-    combined_results = pd.concat([rfm_results, kmeans_results, tree_results], ignore_index=True)
+        # Concatenate the DataFrames
+        combined_results = pd.concat([rfm_results, kmeans_results, tree_results], ignore_index=True)
+        combined_results = combined_results[combined_results["Number of Clusters"] == num_clusters]
+        combined_results = combined_results.drop("Number of Clusters", axis=1)
 
-    st.dataframe(combined_results)
+        if not combined_results.empty:
+            # Display the comparison data
+            st.write("##### Comparision of clustering results")
+            st.dataframe(combined_results)
+        else:
+            st.warning("No records found in the clustering results data. Please select the 'Build Project' menu to generate results.")
+    
+        # Load the tree map images
+        rfm_tree_map = Image.open(f"rfm_tree_map_{num_clusters}_clusters.png")
+        kmeans_tree_map = Image.open(f"kmeans_tree_map_{num_clusters}_clusters.png")
+        hierarchical_tree_map = Image.open(f"hierarchical_tree_map_{num_clusters}_clusters.png")
 
+        # Load the scatter plot images
+        rfm_scatter_plot = Image.open(f"rfm_scatter_plot_{num_clusters}_clusters.png")
+        kmeans_scatter_plot = Image.open(f"kmeans_scatter_plot_{num_clusters}_clusters.png")
+        hierarchical_scatter_plot = Image.open(f"hierarchical_scatter_plot_{num_clusters}_clusters.png")
 
-    # Load the tree map images
-    rfm_tree_map = Image.open("rfm_tree_map.png")
-    kmeans_tree_map = Image.open("kmeans_tree_map.png")
-    hierarchical_tree_map = Image.open("hierarchical_tree_map.png")
+        # Display the images in two rows, three columns
+        st.write("##### Comparison of Tree Maps")
+        col1, col2, col3 = st.columns(3)
 
-    # Load the scatter plot images
-    rfm_scatter_plot = Image.open("rfm_scatter_plot.png")
-    kmeans_scatter_plot = Image.open("kmeans_scatter_plot.png")
-    hierarchical_scatter_plot = Image.open("hierarchical_scatter_plot.png")
+        col1.image(rfm_tree_map, caption="RFM Tree Map", use_column_width=True)
+        col2.image(kmeans_tree_map, caption="K-Means Tree Map", use_column_width=True)
+        col3.image(hierarchical_tree_map, caption="Hierarchical Tree Map", use_column_width=True)
 
-    # Display the images in two rows, three columns
-    st.write("##### Comparison of Tree Maps")
-    col1, col2, col3 = st.columns(3)
+        st.write("##### Comparison of Scatter Plots")
+        col4, col5, col6 = st.columns(3)
 
-    col1.image(rfm_tree_map, caption="RFM Tree Map", use_column_width=True)
-    col2.image(kmeans_tree_map, caption="K-Means Tree Map", use_column_width=True)
-    col3.image(hierarchical_tree_map, caption="Hierarchical Tree Map", use_column_width=True)
+        col4.image(rfm_scatter_plot, caption="RFM Scatter Plot", use_column_width=True)
+        col5.image(kmeans_scatter_plot, caption="K-Means Scatter Plot", use_column_width=True)
+        col6.image(hierarchical_scatter_plot, caption="Hierarchical Scatter Plot", use_column_width=True)
 
-    st.write("##### Comparison of Scatter Plots")
-    col4, col5, col6 = st.columns(3)
+        st.write("##### Summary: ")
+        st.markdown("""
+        After analyzing the segmentation results, it's evident that both K-Means and Hierarchical Clustering methods yield similar segmentation outcomes. However, K-Means stands out with its faster training time and superior silhouette score.
 
-    col4.image(rfm_scatter_plot, caption="RFM Scatter Plot", use_column_width=True)
-    col5.image(kmeans_scatter_plot, caption="K-Means Scatter Plot", use_column_width=True)
-    col6.image(hierarchical_scatter_plot, caption="Hierarchical Scatter Plot", use_column_width=True)
+        In terms of clustering quality, the manual RFM segmentation, based on domain knowledge, proves to be the most effective approach. It divides the dataset into distinct segments, each with a reasonably balanced size.
 
-    st.write("##### Summary: ")
-    st.markdown("""
-    After analyzing the segmentation results, it's evident that both K-Means and Hierarchical Clustering methods yield similar segmentation outcomes. However, K-Means stands out with its faster training time and superior silhouette score.
-
-    In terms of clustering quality, the manual RFM segmentation, based on domain knowledge, proves to be the most effective approach. It divides the dataset into distinct segments, each with a reasonably balanced size.
-
-    In summary, the K-Means clustering model is the preferred choice for making predictions due to its efficient training and competitive performance.
-    """)
+        In summary, the K-Means clustering model is the preferred choice for making predictions due to its efficient training and competitive performance.
+        """)
 
 elif selected_option == "New Prediction":
     st.subheader("New Prediction")
+
+    # # Add a slider to select the number of clusters (from 2 to 7)
+    # num_clusters = st.slider("Select Number of Clusters", min_value=2, max_value=7, value=4)
+    # Create a text input for the number of clusters
+    num_clusters = st.text_input("Enter Number of Clusters", "3")  # Default value is "3"
+
+    # Convert the input to an integer
+    num_clusters = int(num_clusters)  # Assuming the input is a valid integer
+
+    # Check if the input is within the range of 2 to 7
+    if 2 <= num_clusters <= 7:
+        st.success(f"Number of Clusters: {num_clusters}")
+    else:
+        st.error("Please enter a value between 2 and 7 for the number of clusters.")
+
     # Initialize the session state to store transaction data
     if 'transactions' not in st.session_state:
         st.session_state.transactions = pd.DataFrame(columns=['transaction_date', 'num_cds_purchased', 'transaction_value'])
+    if 'customers_transactions' not in st.session_state:
+        st.session_state.customers_transactions = pd.DataFrame(columns=['customer_id','transaction_date', 'num_cds_purchased', 'transaction_value'])
 
     # Create a radio button for selecting data input option
     data_input_option = st.radio("Select Data Input Option", ("Input Data", "Load Data"), index=0)  # Default to "Input Data"
@@ -931,7 +1116,12 @@ elif selected_option == "New Prediction":
                 df_RFM.columns = ['Recency', 'Frequency', 'Monetary']
 
                 st.dataframe(df_RFM)
-                kmeans_model = joblib.load("kmeans_model.pkl")
+
+                # Scale the features
+                scaler = StandardScaler()
+                rfm_scaled = scaler.fit_transform(df_RFM)
+
+                kmeans_model = joblib.load(f"kmeans_model_{num_clusters}_clusters.pkl")
                 user_clusters = kmeans_model.predict(df_RFM[['Recency', 'Frequency', 'Monetary']])
                 # Format the message as a single string
                 success_message = f"Predicted Clusters: {user_clusters}"
@@ -941,130 +1131,108 @@ elif selected_option == "New Prediction":
             else:
                 st.warning("No transactions to process.")
     else:
-        # Add code to load data from a file when "Load Data" is selected
-        # You can use st.file_uploader or any other method to load data
-        # Upload file
         uploaded_file = st.file_uploader("Choose a file", type=['txt','csv'])
         #st.write(uploaded_file.name)
         if uploaded_file is not None:
-            file_name = uploaded_file.name
-            # Load and preprocess the data
-            df = load_data(file_name)
-            st.success(f"{len(df)} transactions are loaded successfully")
+            # file_name = uploaded_file.name
+            # # Load and preprocess the data
+            # df = load_data(file_name)
+            st.session_state.customers_transactions  = process_uploaded_file(uploaded_file)
+            st.success(f"{len(st.session_state.customers_transactions)} transactions are loaded successfully")
+            #df = st.session_state.customers_transactions
             # Convert 'transaction_date' to datetime64 format
-            df['transaction_date'] = pd.to_datetime(df['transaction_date'], format='%Y%m%d')
-       
+            st.session_state.customers_transactions['transaction_date'] = pd.to_datetime(st.session_state.customers_transactions['transaction_date'], format='%Y%m%d')
+        
+
         if st.button("Customer Segment"):
-            df_RFM = df.groupby('customer_id').agg({
-                    'transaction_date': lambda x: (end_date - x.max()).days,
-                    'transaction_value': ['count', 'sum']
-                })
+            if not st.session_state.customers_transactions.empty and uploaded_file is not None: 
+                df_RFM = st.session_state.customers_transactions.groupby('customer_id').agg({
+                        'transaction_date': lambda x: (end_date - x.max()).days,
+                        'transaction_value': ['count', 'sum']
+                    })
 
-            df_RFM.columns = ['Recency', 'Frequency', 'Monetary']
-            # Select the columns to use for clustering
-            rfm_selected = df_RFM[['Recency', 'Frequency', 'Monetary']]
+                df_RFM.columns = ['Recency', 'Frequency', 'Monetary']
+                # Select the columns to use for clustering
+                rfm_selected = df_RFM[['Recency', 'Frequency', 'Monetary']]
 
-            # Scale the features
-            scaler = StandardScaler()
-            rfm_scaled = scaler.fit_transform(rfm_selected)
+                # Scale the features
+                scaler = StandardScaler()
+                rfm_scaled = scaler.fit_transform(rfm_selected)
 
-            
-            # Build the K-Means model with the specified number of clusters
-            kmeans_model = joblib.load("kmeans_model.pkl")
-            new_cluster_labels  = kmeans_model.predict(rfm_scaled)
+                
+                # Build the K-Means model with the specified number of clusters
+                kmeans_model = joblib.load(f"kmeans_model_{num_clusters}_clusters.pkl")
+                new_cluster_labels  = kmeans_model.predict(rfm_scaled)
 
-            # Add cluster labels to the DataFrame
-            df_RFM['Cluster'] = new_cluster_labels
+                # Add cluster labels to the DataFrame
+                df_RFM['Cluster'] = new_cluster_labels
 
-            # Display segmentation results
-            st.write("##### KMeans Customer Segmentation Sample Results")
-            st.dataframe(df_RFM)
+                # Display segmentation results
+                st.write("##### KMeans Customer Segmentation Sample Results")
+                st.dataframe(df_RFM)
 
-            # Write result clustering to csv
-            df_RFM.to_csv('prediction_result_data.csv', index=False)
-
-
-            # Calculate average values for each cluster
-            rfm_agg2 = df_RFM.groupby('Cluster').agg({
-                'Recency': 'mean',
-                'Frequency': 'mean',
-                'Monetary': ['mean', 'count']}).round(0)
-
-            rfm_agg2.columns = rfm_agg2.columns.droplevel()
-            rfm_agg2.columns = ['RecencyMean', 'FrequencyMean', 'MonetaryMean', 'Count']
-            rfm_agg2['Percent'] = round((rfm_agg2['Count'] / rfm_agg2.Count.sum()) * 100, 2)
-
-            # Reset the index
-            rfm_agg2 = rfm_agg2.reset_index()
-
-            # Change the Cluster column's datatype into discrete values
-            rfm_agg2['Cluster'] = 'Cluster ' + rfm_agg2['Cluster'].astype('str')
-            st.write("##### KMeans Customer Segmentation Results")
-            st.dataframe(rfm_agg2)
-
-            # #Visualization
-            # # Get cluster centroids
-            # centroids = kmeans_model.cluster_centers_
-
-            # # Create a scatter plot
-            # fig, ax = plt.subplots(figsize=(8, 6))
-
-            # # Plot data points
-            # scatter = ax.scatter(df_RFM['Recency'], df_RFM['Frequency'], c=df_RFM['Cluster'], cmap='viridis', label='Data Points')
-
-            # # Plot cluster centroids
-            # ax.scatter(centroids[:, 0], centroids[:, 1], c='red', marker='X', s=200, label='Cluster Centroids')
-
-            # ax.set_title('Cluster Visualization with Centroids')
-            # ax.set_xlabel('Recency')
-            # ax.set_ylabel('Frequency')
-            # ax.legend()
-
-            # # Display the plot in Streamlit
-            # st.pyplot(fig)
-
-            # Create a separate figure for the tree map
-            fig1, ax_1 = plt.subplots(figsize=(14, 10))
-
-            colors_dict2 = {'Cluster0': 'yellow', 'Cluster1': 'royalblue', 'Cluster2': 'cyan',
-                            'Cluster3': 'red', 'Cluster4': 'purple', 'Cluster5': 'green', 'Cluster6': 'gold'}
-
-            squarify.plot(sizes=rfm_agg2['Count'],
-                        text_kwargs={'fontsize': 12, 'weight': 'bold', 'fontname': "sans serif"},
-                        color=colors_dict2.values(),
-                        label=['{} \n{:.0f} days \n{:.0f} orders \n{:.0f} $ \n{:.0f} customers ({}%)'.format(*rfm_agg2.iloc[i])
-                                for i in range(0, len(rfm_agg2))], alpha=0.5)
-
-            plt.title("Customers Segments Tree Map", fontsize=26, fontweight="bold")
-            plt.axis('off')
-
-            # Save the tree map as an image file
-            fig1.savefig("result_tree_map.png", bbox_inches='tight')
-
-            # Display the saved tree map using st.image
-            st.image("result_tree_map.png")
-
-            # Create a color scale (e.g., viridis, rainbow, jet, etc.)
-            color_scale = px.colors.sequential.Viridis  # You can change this to your preferred color scale
-
-            # Scatter plot with the chosen color scale
-            fig2 = px.scatter(rfm_agg2, x="RecencyMean", y="MonetaryMean", size="FrequencyMean", color="Cluster",
-                            hover_name="Cluster", size_max=100, color_continuous_scale=color_scale)
-
-            # Save the scatter plot as an image file using Plotly's to_image method
-            scatter_image = pio.to_image(fig2, format="png", width=800, height=600, scale=1)
-
-            # Save the image to a file
-            with open("results_scatter_plot.png", "wb") as img_file:
-                img_file.write(scatter_image)
-
-            st.write("##### Customer Segments Scatter Plot")
-            # Display the saved scatter plot using st.image
-            st.image("results_scatter_plot.png")
-            
+                # Write result clustering to csv
+                df_RFM.to_csv('prediction_result_data.csv', index=False)
 
 
+                # Calculate average values for each cluster
+                rfm_agg2 = df_RFM.groupby('Cluster').agg({
+                    'Recency': 'mean',
+                    'Frequency': 'mean',
+                    'Monetary': ['mean', 'count']}).round(0)
 
+                rfm_agg2.columns = rfm_agg2.columns.droplevel()
+                rfm_agg2.columns = ['RecencyMean', 'FrequencyMean', 'MonetaryMean', 'Count']
+                rfm_agg2['Percent'] = round((rfm_agg2['Count'] / rfm_agg2.Count.sum()) * 100, 2)
 
+                # Reset the index
+                rfm_agg2 = rfm_agg2.reset_index()
 
+                # Change the Cluster column's datatype into discrete values
+                rfm_agg2['Cluster'] = 'Cluster ' + rfm_agg2['Cluster'].astype('str')
+                st.write("##### KMeans Customer Segmentation Results")
+                st.dataframe(rfm_agg2)
+
+                #Visualization
+                
+                # Create a separate figure for the tree map
+                fig1, ax_1 = plt.subplots(figsize=(14, 10))
+
+                colors_dict2 = {'Cluster0': 'yellow', 'Cluster1': 'royalblue', 'Cluster2': 'cyan',
+                                'Cluster3': 'red', 'Cluster4': 'purple', 'Cluster5': 'green', 'Cluster6': 'gold'}
+
+                squarify.plot(sizes=rfm_agg2['Count'],
+                            text_kwargs={'fontsize': 12, 'weight': 'bold', 'fontname': "sans serif"},
+                            color=colors_dict2.values(),
+                            label=['{} \n{:.0f} days \n{:.0f} orders \n{:.0f} $ \n{:.0f} customers ({}%)'.format(*rfm_agg2.iloc[i])
+                                    for i in range(0, len(rfm_agg2))], alpha=0.5)
+
+                plt.title("Customers Segments Tree Map", fontsize=26, fontweight="bold")
+                plt.axis('off')
+
+                # Save the tree map as an image file
+                fig1.savefig("result_tree_map.png", bbox_inches='tight')
+
+                # Display the saved tree map using st.image
+                st.image("result_tree_map.png")
+
+                # Create a color scale (e.g., viridis, rainbow, jet, etc.)
+                color_scale = px.colors.sequential.Viridis  # You can change this to your preferred color scale
+
+                # Scatter plot with the chosen color scale
+                fig2 = px.scatter(rfm_agg2, x="RecencyMean", y="MonetaryMean", size="FrequencyMean", color="Cluster",
+                                hover_name="Cluster", size_max=100, color_continuous_scale=color_scale)
+
+                # Save the scatter plot as an image file using Plotly's to_image method
+                scatter_image = pio.to_image(fig2, format="png", width=800, height=600, scale=1)
+
+                # Save the image to a file
+                with open("results_scatter_plot.png", "wb") as img_file:
+                    img_file.write(scatter_image)
+
+                st.write("##### Customer Segments Scatter Plot")
+                # Display the saved scatter plot using st.image
+                st.image("results_scatter_plot.png")
+            else:
+                st.warning("There is no transaction to process")
             
