@@ -350,8 +350,13 @@ def plot_elbow_chart(data, max_clusters=20):
     ax0.set_xlabel('k')
     ax0.set_ylabel('SSE')
     sns.pointplot(x=list(sse.keys()), y=list(sse.values()), ax=ax0)
+
+    fig0.savefig("elbow_kmeans.png", bbox_inches='tight')
+
+    # Display the saved image using st.image
+    st.image("elbow_kmeans.png")
     
-    st.pyplot(fig0)
+    #st.pyplot(fig0)
 
 # Define a function to build the K-Means model with the specified k value
 def build_kmeans_model(data, k):
@@ -396,7 +401,8 @@ def perform_kmeans_clustering(df_RFM, num_clusters=2):
     rfm_scaled = scaler.fit_transform(rfm_selected)
 
     st.write("##### Elbow Method for K-Means Clustering")
-    plot_elbow_chart(rfm_scaled)
+    #plot_elbow_chart(rfm_scaled)
+    st.image("elbow_kmeans.png")
     st.markdown(f"**Select k = {num_clusters}**")
 
     start_time = time.time()  # Start timing the function
@@ -921,15 +927,15 @@ elif selected_option == 'Build Project':
 
         
     # # Perform Hierachical Clustering
-    if st.button("Perform Hierachical Clustering",key="tree"):
-        rfm_selected = df_RFM[['Recency','Frequency','Monetary']]
-        tree_results, tree_time, tree_silhouette = perform_hierarchical_clustering(rfm_selected,num_clusters)
-        update_global_results(num_clusters,"Hierachical Clustering", tree_time, tree_silhouette)
-        # Define the file path where you want to save the CSV file
-        csv_file_path = "tree_results.csv"
+    # if st.button("Perform Hierachical Clustering",key="tree"):
+    #     rfm_selected = df_RFM[['Recency','Frequency','Monetary']]
+    #     tree_results, tree_time, tree_silhouette = perform_hierarchical_clustering(rfm_selected,num_clusters)
+    #     update_global_results(num_clusters,"Hierachical Clustering", tree_time, tree_silhouette)
+    #     # Define the file path where you want to save the CSV file
+    #     csv_file_path = "tree_results.csv"
 
-        # Use the to_csv method to write the DataFrame to a CSV file
-        tree_results.to_csv(csv_file_path, index=False)
+    #     # Use the to_csv method to write the DataFrame to a CSV file
+    #     tree_results.to_csv(csv_file_path, index=False)
 
     # # Perform K-Means clustering pyspark
     # if st.button("Perform Pyspark K-Means Clustering"):
